@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "query": "Qual o dia das eleições no primeiro turno de 2026?",
+    "expected_source": "[DEMO] Calendário eleitoral 2026",
+    "topic": "calendário eleitoral"
+  },
+  {
+    "id": 2,
+    "query": "Até quantos dias antes da divulgação as pesquisas eleitorais devem ser registradas?",
+    "expected_source": "[DEMO] Calendário eleitoral 2026",
+    "topic": "registro de pesquisas"
+  },
+  {
+    "id": 3,
+    "query": "Quais as propostas do candidato Lula sobre isenção do Imposto de Renda?",
+    "expected_source": "[DEMO] Cenário sintético de propostas - Lula",
+    "topic": "imposto de renda"
+  },
+  {
+    "id": 4,
+    "query": "O que Lula propõe sobre lucros e dividendos?",
+    "expected_source": "[DEMO] Cenário sintético de propostas - Lula",
+    "topic": "tributação de super-ricos"
+  },
+  {
+    "id": 5,
+    "query": "Qual o posicionamento de Tarcísio de Freitas sobre as alíquotas do IBS/CBS?",
+    "expected_source": "[DEMO] Cenário sintético de propostas - Tarcísio",
+    "topic": "reforma tributária"
+  },
+  {
+    "id": 6,
+    "query": "Tarcísio de Freitas defende privatizações de infraestrutura?",
+    "expected_source": "[DEMO] Cenário sintético de propostas - Tarcísio",
+    "topic": "concessões e privatizações"
+  },
+  {
+    "id": 7,
+    "query": "Qual a proposta de Ciro Gomes sobre escolas de tempo integral?",
+    "expected_source": "[DEMO] Cenário sintético de propostas - Ciro",
+    "topic": "educação"
+  },
+  {
+    "id": 8,
+    "query": "O que Romeu Zema propõe sob o lema 'Mais Brasil, Menos Brasília'?",
+    "expected_source": "[DEMO] Cenário sintético de propostas - Zema",
+    "topic": "pacto federativo"
+  }
+]

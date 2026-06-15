@@ -1,0 +1,29 @@
+name: Deploy Hugging Face Space
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    if: ${{ secrets.HF_TOKEN != '' && secrets.HF_SPACE != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install "huggingface_hub>=0.32,<1"
+      - name: Upload repository to the Docker Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ secrets.HF_SPACE }}
+        run: >
+          hf upload "$HF_SPACE" . .
+          --repo-type space
+          --token "$HF_TOKEN"
+          --exclude ".git/*"
+          --exclude ".venv/*"
+          --exclude ".env"
+          --exclude "*.db"
