@@ -9,6 +9,8 @@ app_port: 7860
 
 # Eleição IA 2026 — RAG, Public Data, and Forecasting Portfolio Demo
 
+[Open the live demo](https://nunnega-eleicao-ia-2026.hf.space)
+
 This portfolio project combines **Retrieval-Augmented Generation (RAG)**,
 official Brazilian legislative open-data APIs, synthetic polling averages, and
 transparent forecasting simulations.
