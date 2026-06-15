@@ -1,0 +1,33 @@
+name: Refresh Official Data
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install "requests>=2.32,<3" "beautifulsoup4>=4.13,<5"
+      - run: python scripts/refresh_official_data.py
+      - name: Commit updated snapshots
+        shell: bash
+        run: |
+          if git diff --quiet -- data/official; then
+            echo "No official-data changes detected."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/official
+          git commit -m "Refresh official TSE calendar snapshot"
+          git push

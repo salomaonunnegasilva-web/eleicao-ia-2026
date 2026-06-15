@@ -8,8 +8,17 @@ from app.data_sources.camara_client import (
     list_deputies,
 )
 from app.data_sources.senado_client import SenadoAPIError, list_senators
+from app.data_sources.tse_client import TSEDataError, get_calendar
 
 router = APIRouter()
+
+
+@router.get("/official/tse/calendar")
+def get_official_tse_calendar():
+    try:
+        return get_calendar(year=2026)
+    except TSEDataError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @router.get("/official/deputies")

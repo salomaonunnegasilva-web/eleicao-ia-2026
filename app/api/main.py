@@ -59,7 +59,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="Eleição IA 2026 Backend",
     description="Portfolio demo API for a source-grounded RAG and forecasting assistant",
-    version="1.1.0",
+    version="1.2.0",
     lifespan=lifespan,
 )
 

@@ -141,20 +141,52 @@ def generate_local_fallback_answer(
         )
 
     unique_contexts = _unique_contexts(context_chunks)
-    ans = [
-        "### Resposta baseada no conjunto recuperado",
-        f"**Aviso de dados:** {settings.data_notice}\n",
-    ]
+    contains_synthetic = any(
+        str(chunk.get("source_type", "")).startswith("demo_")
+        for chunk in unique_contexts
+    )
+    contains_official = any(
+        chunk.get("official")
+        or str(chunk.get("source_type", "")).startswith("official_")
+        for chunk in unique_contexts
+    )
+    heading = (
+        "### Resposta fundamentada em fontes oficiais"
+        if contains_official and not contains_synthetic
+        else "### Resposta baseada no conjunto recuperado"
+    )
+    ans = [heading]
+    if contains_synthetic:
+        ans.append(f"**Aviso de dados:** {settings.data_notice}\n")
+    elif contains_official:
+        freshness = (
+            "consulta ao vivo"
+            if any(chunk.get("live_data") for chunk in unique_contexts)
+            else "snapshot oficial versionado"
+        )
+        ans.append(
+            f"**Proveniência:** dados oficiais ({freshness}). "
+            "A resposta abaixo permanece limitada aos registros recuperados.\n"
+        )
 
     for idx, chunk in enumerate(unique_contexts):
         title = chunk["title"]
         author = chunk.get("author", "Desconhecido")
-        pub_date = chunk.get("publication_date", "N/A")
+        pub_date = chunk.get("publication_date") or "N/A"
         text_snippet = chunk["text"]
         excerpt = text_snippet[:500].strip()
+        freshness_label = ""
+        if chunk.get("official"):
+            freshness_label = (
+                " | **Estado:** ao vivo"
+                if chunk.get("live_data")
+                else " | **Estado:** snapshot oficial"
+            )
 
         ans.append(f"#### [{idx + 1}] {title}")
-        ans.append(f"- **Autor:** {author} | **Data:** {pub_date}")
+        ans.append(
+            f"- **Autor:** {author} | **Data:** {pub_date}{freshness_label}"
+        )
         ans.append(f"- **Trecho recuperado:** {excerpt}\n")
 
     if "tribut" in query_lower:
@@ -212,6 +244,12 @@ def generate_grounded_answer(
         docs_context_str += f"Autor/Candidato: {chunk.get('author') or 'N/A'}\n"
         docs_context_str += f"Data de Publicação: {chunk.get('publication_date') or 'N/A'}\n"
         docs_context_str += f"URL: {chunk.get('source_url') or 'N/A'}\n"
+        docs_context_str += (
+            f"Fonte oficial: {'sim' if chunk.get('official') else 'não'}\n"
+        )
+        docs_context_str += (
+            f"Dado ao vivo: {'sim' if chunk.get('live_data') else 'não'}\n"
+        )
         docs_context_str += f"Texto: {chunk['text']}\n\n"
 
     polls_context_str = ""
@@ -244,6 +282,8 @@ Instruções Cruciais:
 4. Nunca faça previsões subjetivas. Use o termo "estatístico" ou "probabilístico" baseado nos dados de simulação, destacando a incerteza e margens de erro.
 5. Cite os documentos usando [1], [2], etc.
 6. Declare claramente que pesquisas e propostas marcadas como DEMO são sintéticas.
+7. Diferencie consulta oficial ao vivo de snapshot oficial versionado.
+8. Não transforme proposições legislativas em programa de governo.
 
 --- DADOS DISPONÍVEIS ---
 {docs_context_str}
@@ -287,6 +327,12 @@ Resposta em Português:"""
                 "publication_date": c.get("publication_date"),
                 "author": c.get("author"),
                 "synthetic": str(c.get("source_type", "")).startswith("demo_"),
+                "official": bool(
+                    c.get("official")
+                    or str(c.get("source_type", "")).startswith("official_")
+                ),
+                "live_data": bool(c.get("live_data")),
+                "retrieved_at": c.get("retrieved_at"),
             }
             for c in _unique_contexts(context_chunks)
         ],

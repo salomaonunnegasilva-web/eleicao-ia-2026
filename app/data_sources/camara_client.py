@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import time
 from typing import Any
 
 import requests
@@ -12,6 +13,8 @@ HEADERS = {
     "Accept": "application/json",
     "User-Agent": "eleicao-ia-portfolio/1.1 (public-data educational demo)",
 }
+OFFICEHOLDER_CACHE_TTL_SECONDS = 10 * 60
+_all_deputies_cache: dict[str, Any] = {"expires_at": 0.0, "items": None}
 
 
 class CamaraAPIError(RuntimeError):
@@ -74,17 +77,72 @@ def list_deputies(
         params["siglaUf"] = state.upper()
 
     records = _get("/deputados", params).get("dados", [])
+    return [_normalize_deputy(record) for record in records]
+
+
+def _normalize_deputy(record: dict) -> dict:
+    return {
+        "id": record["id"],
+        "name": record["nome"],
+        "party": record.get("siglaPartido"),
+        "state": record.get("siglaUf"),
+        "photo_url": record.get("urlFoto"),
+        "email": record.get("email"),
+        "profile_url": record.get("uri"),
+        "source": "Câmara dos Deputados - Dados Abertos",
+        "source_url": SOURCE_URL,
+        "office": "deputy",
+    }
+
+
+def list_all_deputies() -> list[dict]:
+    now = time.monotonic()
+    cached = _all_deputies_cache.get("items")
+    if cached is not None and now < float(_all_deputies_cache["expires_at"]):
+        return cached
+
+    records = _get_all(
+        "/deputados",
+        {
+            "itens": 100,
+            "ordem": "ASC",
+            "ordenarPor": "nome",
+        },
+        max_pages=10,
+    )
+    items = [_normalize_deputy(record) for record in records]
+    _all_deputies_cache["items"] = items
+    _all_deputies_cache["expires_at"] = now + OFFICEHOLDER_CACHE_TTL_SECONDS
+    return items
+
+
+def fetch_deputy_recent_propositions(
+    deputy_id: int,
+    limit: int = 8,
+) -> list[dict]:
+    records = _get(
+        "/proposicoes",
+        {
+            "idDeputadoAutor": deputy_id,
+            "itens": max(1, min(limit, 20)),
+            "ordem": "DESC",
+            "ordenarPor": "id",
+        },
+    ).get("dados", [])
     return [
         {
-            "id": record["id"],
-            "name": record["nome"],
-            "party": record.get("siglaPartido"),
-            "state": record.get("siglaUf"),
-            "photo_url": record.get("urlFoto"),
-            "email": record.get("email"),
-            "profile_url": record.get("uri"),
-            "source": "Câmara dos Deputados - Dados Abertos",
-            "source_url": SOURCE_URL,
+            "id": record.get("id"),
+            "identifier": " ".join(
+                str(value)
+                for value in (
+                    record.get("siglaTipo"),
+                    record.get("numero"),
+                    record.get("ano"),
+                )
+                if value not in (None, "")
+            ),
+            "summary": record.get("ementa"),
+            "api_url": record.get("uri"),
         }
         for record in records
     ]

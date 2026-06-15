@@ -3,7 +3,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from app.rag.retrieval import classify_query, retrieve_hybrid_chunks
+from app.rag.retrieval import retrieve_hybrid_chunks
 
 
 QUESTIONS_PATH = Path(__file__).with_name("test_questions.json")
@@ -15,7 +15,12 @@ def evaluate_retrieval(db: Session) -> dict:
     successful = 0
 
     for question in questions:
-        chunks = retrieve_hybrid_chunks(db, question["query"], limit=4)
+        chunks = retrieve_hybrid_chunks(
+            db,
+            question["query"],
+            limit=4,
+            source_types=("demo_calendar", "demo_policy_scenario"),
+        )
         titles = list(dict.fromkeys(chunk["title"] for chunk in chunks))
         success = any(
             question["expected_source"].casefold() in title.casefold()
@@ -28,7 +33,7 @@ def evaluate_retrieval(db: Session) -> dict:
                 "query": question["query"],
                 "expected_source": question["expected_source"],
                 "retrieved_sources": titles,
-                "route": classify_query(question["query"]),
+                "route": "demo_retrieval",
                 "success": success,
             }
         )

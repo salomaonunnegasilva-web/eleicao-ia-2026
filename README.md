@@ -11,29 +11,59 @@ app_port: 7860
 
 [Open the live demo](https://nunnega-eleicao-ia-2026.hf.space)
 
-This portfolio project combines **Retrieval-Augmented Generation (RAG)**,
-official Brazilian legislative open-data APIs, synthetic polling averages, and
-transparent forecasting simulations.
+This portfolio project combines an **official-first question-answering
+assistant**, Brazilian government open-data APIs, Retrieval-Augmented
+Generation (RAG), and a separately labeled synthetic forecasting demonstration.
 
-The application deliberately separates two data layers:
+The assistant currently answers from:
 
-- **Official live data:** fetched directly from the Chamber of Deputies and
-  Federal Senate open-data APIs.
-- **Synthetic election demo:** candidates, policy scenarios, polls, and Monte
-  Carlo outputs used only to demonstrate engineering and modeling.
+- **TSE:** live 2026 election-calendar entries, with a versioned snapshot
+  fallback.
+- **Câmara dos Deputados:** current deputy profiles, current-year expenses, and
+  authored propositions.
+- **Senado Federal:** current senator profiles and recent associated legislative
+  processes.
 
-The synthetic layer must not be interpreted as real electoral information.
+Candidate programs and policy comparisons are answered only when an official
+program or statement has been indexed. Otherwise, the assistant refuses rather
+than substituting synthetic content. Polling and Monte Carlo tabs remain
+synthetic and must not be interpreted as real electoral information.
 
 ---
 
 ## Technical Stack
 - **Backend**: FastAPI (Python)
 - **Database**: PostgreSQL with `pgvector`, with SQLite support for local/demo use
-- **Retrieval**: hybrid vector + keyword search with reciprocal-rank fusion
+- **Retrieval**: source-constrained hybrid vector + keyword search with
+  relevance filtering and reciprocal-rank fusion
 - **LLM**: optional Gemini free tier, with deterministic local fallback
 - **Frontend**: Streamlit with custom zinc-grade layout and Plotly charts
 - **Deployment**: Docker Compose locally; Docker Space on Hugging Face publicly
 - **CI/CD**: GitHub Actions
+- **Official-data refresh**: scheduled TSE snapshot refresh through GitHub
+  Actions
+
+## Current Question Coverage
+
+Examples supported with official sources:
+
+```text
+When is the first round of the 2026 election?
+When is the candidate-registration deadline?
+What are the current expenses of deputy Tabata Amaral?
+Which recent bills are associated with senator Flávio Bolsonaro?
+```
+
+Example intentionally refused:
+
+```text
+Compare Lula and Flávio's 2026 government programs.
+```
+
+As of June 15, 2026, registered 2026 candidacies and government programs are not
+yet complete. The official convention period is July 20 through August 5, and
+the candidacy-registration deadline is August 15. The project does not present
+pre-candidate speculation as an official program.
 
 ---
 
@@ -73,6 +103,10 @@ eleicao-ia-2026/
 ├── frontend/
 │   └── streamlit_app.py
 │
+├── data/official/
+│   └── tse_calendar_2026.json
+├── scripts/
+│   └── refresh_official_data.py
 ├── .github/workflows/
 ├── deploy/start-space.sh
 ├── tests/
@@ -146,6 +180,20 @@ The root `Dockerfile` runs FastAPI internally and exposes Streamlit on port
 
 GitHub Actions performs CI/CD; it does not host the persistent web application.
 
+The `Refresh Official Data` workflow runs daily. It fetches the official TSE
+calendar, compares a content checksum, and commits a new snapshot only when the
+source changes. Runtime requests prefer the live TSE page and use the snapshot
+only when that request fails.
+
+## API Routes
+
+- `POST /api/chat`: official-first question answering
+- `GET /api/official/tse/calendar`: live TSE calendar plus provenance
+- `GET /api/official/deputies`: live Chamber search
+- `GET /api/official/deputies/{id}/metrics`: live expenses and proposition count
+- `GET /api/official/senators`: live Senate directory
+- `GET /api/forecast/*`: explicitly synthetic statistical demonstration
+
 ## Data Sources
 
 - [Câmara dos Deputados — Dados Abertos](https://dadosabertos.camara.leg.br/)
@@ -155,3 +203,6 @@ GitHub Actions performs CI/CD; it does not host the persistent web application.
 The interface concept was inspired by
 [Custo Político](https://www.custopolitico.com.br/en-US), but the application
 does not scrape or depend on that service.
+
+An LLM is optional. Gemini only synthesizes the official evidence supplied by
+the source adapters; it is not used as an unverified web-search substitute.

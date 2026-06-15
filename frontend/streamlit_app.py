@@ -316,9 +316,9 @@ if not backend_info:
     st.stop()
 
 st.warning(
-    "**Demo de portfólio:** pesquisas, candidatos e propostas eleitorais são "
-    "sintéticos. A aba Dados Oficiais consulta diretamente as APIs públicas "
-    "da Câmara dos Deputados e do Senado Federal."
+    "**Assistente oficial-first:** perguntas factuais usam fontes ao vivo do "
+    "TSE, da Câmara dos Deputados e do Senado Federal. Pesquisas e simulações "
+    "continuam sintéticas e aparecem somente nas abas identificadas como demo."
 )
 
 # Load DB counts
@@ -344,8 +344,9 @@ tab_chat, tab_polls, tab_sims, tab_official, tab_ingest, tab_evals = st.tabs([
 # -----------------
 with tab_chat:
     st.caption(
-        "Explore o roteamento RAG e o forecasting com um cenário eleitoral "
-        "sintético, claramente separado dos dados legislativos oficiais."
+        "Faça perguntas sobre calendário eleitoral, parlamentares, despesas e "
+        "projetos legislativos. Sem evidência oficial, o assistente recusa em "
+        "vez de substituir a resposta por conteúdo demonstrativo."
     )
 
     # Session chat history
@@ -359,12 +360,24 @@ with tab_chat:
                 with st.expander("Visualizar Fontes Citadas"):
                     for idx, s in enumerate(msg["sources"]):
                         st.markdown(f"**[{idx+1}] {s['title']}**")
-                        if s.get('author'):
-                            st.caption(f"Autor: {s['author']} | URL: {s.get('url') or 'N/A'}")
-                        else:
-                            st.caption(f"URL: {s.get('url') or 'N/A'}")
+                        source_state = (
+                            "oficial ao vivo"
+                            if s.get("official") and s.get("live_data")
+                            else "snapshot oficial"
+                            if s.get("official")
+                            else "sintético"
+                            if s.get("synthetic")
+                            else "não classificado"
+                        )
+                        st.caption(
+                            f"Autor: {s.get('author') or 'Desconhecido'} "
+                            f"| Estado: {source_state} "
+                            f"| URL: {s.get('url') or 'N/A'}"
+                        )
 
-    if prompt := st.chat_input("Ex: Quais as propostas de Tarcísio e Lula sobre reforma tributária?"):
+    if prompt := st.chat_input(
+        "Ex: Quando é o primeiro turno? Quais os gastos da deputada Tabata Amaral?"
+    ):
         # Display user message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
@@ -381,21 +394,50 @@ with tab_chat:
                     st.markdown(answer)
 
                     # If forecast-heavy query, display info badge
-                    if route in ("forecast", "hybrid"):
-                        st.markdown(f'<span class="badge badge-blue"> Rota: Forecasting Estatístico Ponderado</span>', unsafe_allow_html=True)
-                    elif route == "candidate_profile":
+                    if route == "forecast":
                         st.markdown(
-                            '<span class="badge badge-amber"> Rota: Cadastro Estruturado</span>',
+                            '<span class="badge badge-amber"> Rota: Forecasting Sintético</span>',
+                            unsafe_allow_html=True,
+                        )
+                    elif route == "official_calendar":
+                        st.markdown(
+                            '<span class="badge badge-blue"> Rota: TSE Oficial</span>',
+                            unsafe_allow_html=True,
+                        )
+                    elif route == "official_legislative":
+                        st.markdown(
+                            '<span class="badge badge-blue"> Rota: Dados Legislativos Oficiais</span>',
+                            unsafe_allow_html=True,
+                        )
+                    elif route == "official_policy":
+                        st.markdown(
+                            '<span class="badge badge-amber"> Rota: Evidência Oficial de Programa</span>',
                             unsafe_allow_html=True,
                         )
                     else:
-                        st.markdown(f'<span class="badge badge-green"> Rota: RAG Grounded</span>', unsafe_allow_html=True)
+                        st.markdown(
+                            '<span class="badge badge-green"> Rota: Evidência Oficial</span>',
+                            unsafe_allow_html=True,
+                        )
 
                     if sources:
                         with st.expander("Visualizar Fontes Citadas"):
                             for idx, s in enumerate(sources):
                                 st.markdown(f"**[{idx+1}] {s['title']}**")
-                                st.caption(f"Autor: {s.get('author') or 'Desconhecido'} | URL: {s.get('url') or 'N/A'}")
+                                source_state = (
+                                    "oficial ao vivo"
+                                    if s.get("official") and s.get("live_data")
+                                    else "snapshot oficial"
+                                    if s.get("official")
+                                    else "sintético"
+                                    if s.get("synthetic")
+                                    else "não classificado"
+                                )
+                                st.caption(
+                                    f"Autor: {s.get('author') or 'Desconhecido'} "
+                                    f"| Estado: {source_state} "
+                                    f"| URL: {s.get('url') or 'N/A'}"
+                                )
 
                     st.session_state.messages.append({
                         "role": "assistant",
@@ -713,8 +755,11 @@ with tab_official:
 # TAB 5: RAG base and optional administration
 # -----------------
 with tab_ingest:
-    st.markdown("### Base Documental do RAG")
-    st.caption("Os documentos marcados como DEMO são cenários sintéticos para avaliação técnica.")
+    st.markdown("### Base Documental Demonstrativa")
+    st.caption(
+        "Os documentos marcados como DEMO permanecem apenas para avaliação "
+        "técnica e não são usados nas respostas oficiais do assistente."
+    )
 
     c1, c2 = st.columns(2)
     with c1:

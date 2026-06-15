@@ -33,7 +33,7 @@ services:
       - DECAY_HALF_LIFE_DAYS=${DECAY_HALF_LIFE_DAYS}
       - MONTE_CARLO_ITERATIONS=${MONTE_CARLO_ITERATIONS}
       - MONTE_CARLO_SEED=${MONTE_CARLO_SEED:-42}
-      - DATA_MODE=demo_synthetic
+      - DATA_MODE=official_live
       - PUBLIC_DEMO=false
       - ADMIN_ENABLED=true
       - CORS_ORIGINS=http://localhost:8501

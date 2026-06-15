@@ -36,6 +36,11 @@ class Settings:
                 "Portfolio demonstration using synthetic polling and policy data. "
                 "It must not be interpreted as real electoral information."
             )
+        if self.data_mode == "official_live":
+            return (
+                "Official-first assistant using live TSE, Chamber, and Senate "
+                "sources. Polling and simulations remain synthetic demonstrations."
+            )
         return "Data provenance varies by source. Review citations before relying on results."
 
 
