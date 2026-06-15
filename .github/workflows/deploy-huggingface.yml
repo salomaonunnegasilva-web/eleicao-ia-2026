@@ -7,18 +7,31 @@ on:
 
 jobs:
   deploy:
-    if: ${{ secrets.HF_TOKEN != '' && secrets.HF_SPACE != '' }}
     runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_SPACE: ${{ secrets.HF_SPACE }}
     steps:
+      - name: Check deployment configuration
+        id: config
+        shell: bash
+        run: |
+          if [[ -n "$HF_TOKEN" && -n "$HF_SPACE" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Deployment skipped: configure HF_TOKEN and HF_SPACE repository secrets." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/checkout@v4
+        if: steps.config.outputs.configured == 'true'
       - uses: actions/setup-python@v5
+        if: steps.config.outputs.configured == 'true'
         with:
           python-version: "3.11"
-      - run: pip install "huggingface_hub>=0.32,<1"
+      - if: steps.config.outputs.configured == 'true'
+        run: pip install "huggingface_hub>=0.32,<1"
       - name: Upload repository to the Docker Space
-        env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_SPACE: ${{ secrets.HF_SPACE }}
+        if: steps.config.outputs.configured == 'true'
         run: >
           hf upload "$HF_SPACE" . .
           --repo-type space
