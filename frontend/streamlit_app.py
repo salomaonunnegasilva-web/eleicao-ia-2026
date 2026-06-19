@@ -317,7 +317,8 @@ if not backend_info:
 
 st.warning(
     "**Assistente oficial-first:** perguntas factuais usam fontes ao vivo do "
-    "TSE, da Câmara dos Deputados e do Senado Federal. Pesquisas e simulações "
+    "TSE, da Camara dos Deputados, do Senado Federal, do CNJ DataJud e de "
+    "transparencia publica quando configurada. Pesquisas e simulações "
     "continuam sintéticas e aparecem somente nas abas identificadas como demo."
 )
 
