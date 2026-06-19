@@ -10,7 +10,9 @@ from app.forecasting.polling_average import calculate_polling_average
 from app.forecasting.simulations import run_monte_carlo_simulation
 from app.data_sources.official_answering import (
     build_calendar_chunks,
+    build_integrity_chunks,
     build_legislative_chunks,
+    legal_integrity_unavailable_result,
     official_evidence_unavailable_result,
     policy_evidence_unavailable_result,
 )
@@ -89,6 +91,17 @@ def handle_chat_query(req: ChatRequest, db: Session = Depends(get_db)):
             )
             if context_chunks
             else policy_evidence_unavailable_result(query_text)
+        )
+    elif route == "official_integrity":
+        context_chunks = build_integrity_chunks(query_text)
+        generation_result = (
+            generate_grounded_answer(
+                db=db,
+                query_text=query_text,
+                context_chunks=context_chunks,
+            )
+            if context_chunks
+            else legal_integrity_unavailable_result(query_text)
         )
     elif route == "forecast":
         polling_context = calculate_polling_average(

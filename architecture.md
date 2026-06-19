@@ -18,6 +18,7 @@ FastAPI :8000
   +-- Query classifier
   |     +-- official_calendar
   |     +-- official_legislative
+  |     +-- official_integrity
   |     +-- official_policy
   |     +-- forecast (synthetic demo)
   |     +-- official_evidence
@@ -26,6 +27,8 @@ FastAPI :8000
   |     +-- TSE election calendar (live + snapshot fallback)
   |     +-- Câmara profiles, expenses, propositions
   |     +-- Senado profiles and legislative processes
+  |     +-- CNJ DataJud process-number metadata
+  |     +-- Portal da Transparencia CEIS/CNEP and payroll when configured
   |
   +-- Source-constrained RAG
   |     +-- official program/statement document types only
@@ -52,6 +55,9 @@ FastAPI runs internally on port `8000`. Streamlit is the public process on port
 - Authored Chamber propositions
 - Current Federal Senate directory
 - Recent Senate legislative processes associated with a senator
+- CNJ DataJud judicial-process metadata when a CNJ process number is provided
+- Portal da Transparencia CEIS/CNEP sanctions lookups when an API key is
+  configured
 
 ### Versioned fallback
 
@@ -77,12 +83,22 @@ The router uses normalized Portuguese concepts rather than an LLM classifier:
   route to `official_calendar`.
 - Explicit deputy/senator, expense, bill, proposition, and roll-call questions
   route to `official_legislative`.
+- Process-number, judicial metadata, sanctions, transparency, salary, and
+  remuneration questions route to `official_integrity`.
 - Government-program and candidate-policy comparisons route to
   `official_policy`.
 - Poll averages and simulation requests route to the synthetic forecast module.
 - Other questions route to the general official evidence gate.
 
 If no compatible official source exists, the application refuses to answer.
+
+The integrity route is intentionally conservative. It does not search judicial
+records by broad person-name matching, because names can create false positives.
+CNJ DataJud is used for process-number metadata. Portal da Transparencia
+requires `PORTAL_TRANSPARENCIA_API_KEY`; payroll/remuneration also requires CPF
+or server id and primarily covers federal executive records. Congressional
+remuneration should come from Chamber/Senate-specific transparency sources
+before the app presents a factual salary value.
 
 ## 4. TSE Retrieval
 

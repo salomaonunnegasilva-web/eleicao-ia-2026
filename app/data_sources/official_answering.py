@@ -9,6 +9,22 @@ from app.data_sources.camara_client import (
     fetch_deputy_recent_propositions,
     list_all_deputies,
 )
+from app.data_sources.datajud_client import (
+    DataJudAPIError,
+    SOURCE_URL as DATAJUD_SOURCE_URL,
+    extract_process_numbers,
+    fetch_process_by_number,
+    summarize_process,
+)
+from app.data_sources.portal_transparencia_client import (
+    PortalTransparenciaAPIError,
+    SOURCE_URL as PORTAL_TRANSPARENCIA_SOURCE_URL,
+    extract_cpf,
+    fetch_server_remuneration,
+    has_api_key as portal_transparencia_has_api_key,
+    search_ceis_by_name,
+    search_cnep_by_name,
+)
 from app.data_sources.senado_client import (
     SenadoAPIError,
     fetch_senator_recent_processes,
@@ -43,6 +59,8 @@ _QUERY_STOPWORDS = {
     "os",
     "parlamentar",
     "partido",
+    "processo",
+    "processos",
     "por",
     "projeto",
     "projetos",
@@ -295,6 +313,235 @@ def build_legislative_chunks(query: str, limit_people: int = 3) -> list[dict]:
     return chunks
 
 
+def _datajud_process_chunk(record: dict) -> dict:
+    summary = summarize_process(record)
+    text = (
+        "Registro de metadados processuais do CNJ DataJud. "
+        f"Numero do processo: {summary.get('process_number') or 'N/A'}. "
+        f"Tribunal: {summary.get('tribunal') or summary.get('index') or 'N/A'}. "
+        f"Classe: {summary.get('class_name') or 'N/A'}. "
+        f"Data de ajuizamento: {summary.get('filing_date') or 'N/A'}. "
+        f"Grau: {summary.get('degree') or 'N/A'}. "
+        f"Nivel de sigilo: {summary.get('secrecy_level')}. "
+        f"Orgao julgador: {summary.get('judging_body') or 'N/A'}. "
+        f"Assuntos: {summary.get('subjects') or 'N/A'}. "
+        f"Movimentos recentes: {summary.get('latest_movements') or 'N/A'}. "
+        "Este metadado nao implica culpa, condenacao ou irregularidade."
+    )
+    return {
+        "document_id": (
+            f"datajud-{summary.get('index') or 'unknown'}-"
+            f"{summary.get('process_number') or 'process'}"
+        ),
+        "text": text,
+        "score": 1.0,
+        "title": (
+            "Metadados processuais CNJ DataJud - "
+            f"{summary.get('process_number') or 'processo'}"
+        ),
+        "source_type": "official_datajud_process",
+        "source_url": DATAJUD_SOURCE_URL,
+        "author": "CNJ DataJud - API Publica",
+        "publication_date": summary.get("filing_date"),
+        "official": True,
+        "live_data": True,
+        "retrieved_at": summary.get("retrieved_at"),
+    }
+
+
+def _portal_sanction_chunk(record: dict, registry: str) -> dict:
+    sanctioned = (
+        record.get("sancionado")
+        or record.get("pessoa")
+        or record.get("nomeSancionado")
+        or record.get("razaoSocial")
+        or {}
+    )
+    sanction = record.get("sancao") or record.get("tipoSancao") or {}
+    agency = record.get("orgaoSancionador") or record.get("orgao") or {}
+    process = record.get("processo") or record.get("numeroProcesso")
+    name = (
+        sanctioned.get("nome")
+        if isinstance(sanctioned, dict)
+        else sanctioned
+    ) or record.get("nomeSancionado") or "N/A"
+    sanction_name = (
+        sanction.get("descricao")
+        if isinstance(sanction, dict)
+        else sanction
+    ) or "N/A"
+    agency_name = (
+        agency.get("nome")
+        if isinstance(agency, dict)
+        else agency
+    ) or "N/A"
+    start_date = (
+        record.get("dataInicioSancao")
+        or record.get("dataPublicacaoSancao")
+        or record.get("dataReferencia")
+    )
+    end_date = record.get("dataFimSancao")
+    text = (
+        f"Registro {registry} no Portal da Transparencia. "
+        f"Sancionado: {name}. "
+        f"Sancao: {sanction_name}. "
+        f"Orgao sancionador: {agency_name}. "
+        f"Processo: {process or 'N/A'}. "
+        f"Inicio: {start_date or 'N/A'}. "
+        f"Fim: {end_date or 'N/A'}."
+    )
+    return {
+        "document_id": f"portal-{registry.lower()}-{record.get('id') or name}",
+        "text": text,
+        "score": 1.0,
+        "title": f"Registro {registry} - {name}",
+        "source_type": f"official_portal_{registry.lower()}_sanction",
+        "source_url": PORTAL_TRANSPARENCIA_SOURCE_URL,
+        "author": "Portal da Transparencia / CGU",
+        "publication_date": start_date,
+        "official": True,
+        "live_data": True,
+        "retrieved_at": datetime.now(UTC).isoformat(),
+    }
+
+
+def _portal_remuneration_chunk(record: dict) -> dict:
+    person = record.get("servidor") or record.get("pessoa") or {}
+    name = (
+        person.get("nome")
+        if isinstance(person, dict)
+        else person
+    ) or record.get("nome") or "servidor"
+    amount_keys = (
+        "remuneracaoBasicaBruta",
+        "remuneracaoPosDeducoesObrigatorias",
+        "valorTotalRemuneracaoAposDeducoes",
+        "valorTotalRemuneracao",
+    )
+    values = []
+    for key in amount_keys:
+        if key in record:
+            values.append(f"{key}: {record[key]}")
+    text = (
+        "Registro de remuneracao do Poder Executivo Federal no Portal da "
+        f"Transparencia. Pessoa: {name}. "
+        f"Mes/ano: {record.get('mesAno') or record.get('mesAnoReferencia') or 'N/A'}. "
+        f"Valores retornados: {'; '.join(values) if values else 'ver JSON oficial'}."
+    )
+    return {
+        "document_id": f"portal-remuneration-{record.get('id') or name}",
+        "text": text,
+        "score": 1.0,
+        "title": f"Remuneracao Portal da Transparencia - {name}",
+        "source_type": "official_portal_transparency_remuneration",
+        "source_url": PORTAL_TRANSPARENCIA_SOURCE_URL,
+        "author": "Portal da Transparencia / CGU",
+        "publication_date": str(record.get("mesAno") or ""),
+        "official": True,
+        "live_data": True,
+        "retrieved_at": datetime.now(UTC).isoformat(),
+    }
+
+
+def _transparency_scope_chunk(query: str, people: list[dict]) -> dict:
+    names = ", ".join(person["name"] for person in people) if people else "a pessoa consultada"
+    text = (
+        "Escopo de transparencia conectado: a aplicacao consulta despesas e "
+        "proposicoes legislativas da Camara, processos legislativos do Senado, "
+        "metadados processuais do CNJ DataJud quando o numero do processo e "
+        "informado, e registros CEIS/CNEP do Portal da Transparencia quando a "
+        "chave da API esta configurada. Remuneracao nominal pelo Portal da "
+        "Transparencia exige CPF ou id de servidor do Poder Executivo Federal; "
+        "para deputados e senadores, a remuneracao deve ser integrada por fontes "
+        "proprias da Camara/Senado antes de ser apresentada como valor factual. "
+        f"Consulta preservada: {query}. Pessoa(s) identificada(s): {names}."
+    )
+    return {
+        "document_id": "official-transparency-scope",
+        "text": text,
+        "score": 1.0,
+        "title": "Escopo atual de transparencia oficial",
+        "source_type": "official_transparency_scope",
+        "source_url": PORTAL_TRANSPARENCIA_SOURCE_URL,
+        "author": "Eleicao IA 2026 / fontes oficiais conectadas",
+        "publication_date": None,
+        "official": True,
+        "live_data": False,
+        "retrieved_at": datetime.now(UTC).isoformat(),
+    }
+
+
+def build_integrity_chunks(query: str, limit_people: int = 3) -> list[dict]:
+    normalized_query = normalize_text(query)
+    chunks: list[dict] = []
+
+    process_numbers = extract_process_numbers(query)
+    for process_number in process_numbers:
+        try:
+            records = fetch_process_by_number(process_number, limit=5)
+        except DataJudAPIError:
+            records = []
+        chunks.extend(_datajud_process_chunk(record) for record in records)
+
+    people = resolve_current_officeholders(query, limit=limit_people)
+    wants_sanctions = any(
+        term in normalized_query
+        for term in (
+            "ceis",
+            "cnep",
+            "sancao",
+            "sancoes",
+            "sancionado",
+            "inidoneo",
+            "inidoneidade",
+            "punicao",
+            "portal da transparencia",
+        )
+    )
+    wants_compensation = any(
+        term in normalized_query
+        for term in (
+            "salario",
+            "remuneracao",
+            "contracheque",
+            "subsidio",
+            "subsidios",
+            "quanto ganha",
+        )
+    )
+
+    if wants_sanctions and people and portal_transparencia_has_api_key():
+        for person in people:
+            for registry, search in (
+                ("CEIS", search_ceis_by_name),
+                ("CNEP", search_cnep_by_name),
+            ):
+                try:
+                    records = search(person["name"], limit=3)
+                except PortalTransparenciaAPIError:
+                    records = []
+                chunks.extend(
+                    _portal_sanction_chunk(record, registry)
+                    for record in records
+                )
+
+    cpf = extract_cpf(query)
+    if wants_compensation and cpf and portal_transparencia_has_api_key():
+        try:
+            records = fetch_server_remuneration(cpf=cpf)
+        except PortalTransparenciaAPIError:
+            records = []
+        chunks.extend(_portal_remuneration_chunk(record) for record in records[:3])
+
+    if wants_compensation or (
+        any(term in normalized_query for term in ("judicial", "processo", "processos", "criminal"))
+        and not process_numbers
+    ) or (wants_sanctions and not chunks):
+        chunks.append(_transparency_scope_chunk(query, people))
+
+    return chunks
+
+
 def policy_evidence_unavailable_result(query: str) -> dict:
     try:
         calendar_chunks = build_calendar_chunks(
@@ -371,4 +618,30 @@ def official_evidence_unavailable_result(query: str) -> dict:
         "model": "deterministic-evidence-gate",
         "sources_used": [],
         "fallback_reason": "No connected official source supports the query.",
+    }
+
+
+def legal_integrity_unavailable_result(query: str) -> dict:
+    return {
+        "answer": (
+            "### Evidencia oficial juridica/transparencia insuficiente\n\n"
+            "A pergunta foi reconhecida como consulta juridica, de integridade "
+            "ou remuneracao, mas a aplicacao nao encontrou registros oficiais "
+            "suficientes para responder com seguranca.\n\n"
+            "Para processos judiciais, esta versao consulta o CNJ DataJud por "
+            "numero unico de processo; ela nao faz busca ampla por nome de pessoa "
+            "para evitar falsos positivos. Para remuneracao no Portal da "
+            "Transparencia, a API exige CPF ou id de servidor e chave "
+            "`PORTAL_TRANSPARENCIA_API_KEY`. Para deputados e senadores, valores "
+            "de remuneracao devem vir de fonte propria da Camara ou do Senado "
+            "antes de serem apresentados como fato.\n\n"
+            "A existencia de metadados processuais, sancoes ou registros publicos "
+            "nao implica culpa, condenacao ou irregularidade sem decisao final "
+            "explicitamente citada.\n\n"
+            f"**Pergunta preservada para auditoria:** {query}"
+        ),
+        "provider": "official-evidence-gate",
+        "model": "deterministic-legal-integrity-gate",
+        "sources_used": [],
+        "fallback_reason": "No official legal/transparency record supports the query.",
     }

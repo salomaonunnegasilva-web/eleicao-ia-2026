@@ -414,6 +414,11 @@ with tab_chat:
                             '<span class="badge badge-amber"> Rota: Evidência Oficial de Programa</span>',
                             unsafe_allow_html=True,
                         )
+                    elif route == "official_integrity":
+                        st.markdown(
+                            '<span class="badge badge-blue"> Rota: Integridade e Transparencia Oficial</span>',
+                            unsafe_allow_html=True,
+                        )
                     else:
                         st.markdown(
                             '<span class="badge badge-green"> Rota: Evidência Oficial</span>',

@@ -168,6 +168,21 @@ def generate_local_fallback_answer(
             f"**Proveniência:** dados oficiais ({freshness}). "
             "A resposta abaixo permanece limitada aos registros recuperados.\n"
         )
+        if any(
+            str(chunk.get("source_type", "")).startswith(
+                (
+                    "official_datajud_",
+                    "official_portal_",
+                    "official_transparency_",
+                )
+            )
+            for chunk in unique_contexts
+        ):
+            ans.append(
+                "**Cautela juridica:** registros oficiais de processos, sancoes "
+                "ou remuneracao nao implicam culpa, condenacao, irregularidade "
+                "ou conclusao juridica sem decisao final explicitamente citada.\n"
+            )
 
     for idx, chunk in enumerate(unique_contexts):
         title = chunk["title"]
@@ -324,6 +339,7 @@ Resposta em Português:"""
             {
                 "title": c["title"],
                 "url": c.get("source_url"),
+                "source_type": c.get("source_type"),
                 "publication_date": c.get("publication_date"),
                 "author": c.get("author"),
                 "synthetic": str(c.get("source_type", "")).startswith("demo_"),

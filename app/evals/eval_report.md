@@ -1,5 +1,5 @@
 # Retrieval Evaluation Report — Eleição IA 2026
-Generated on: 2026-06-15
+Generated on: 2026-06-19
 
 ## Metric
 - **Expected-source retrieval recall:** 100.0% (8/8)

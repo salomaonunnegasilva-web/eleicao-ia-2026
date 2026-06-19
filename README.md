@@ -23,6 +23,11 @@ The assistant currently answers from:
   authored propositions.
 - **Senado Federal:** current senator profiles and recent associated legislative
   processes.
+- **CNJ DataJud:** official judicial-process metadata when the user provides a
+  CNJ process number.
+- **Portal da Transparencia / CGU:** optional CEIS/CNEP sanctions and federal
+  executive remuneration lookups when `PORTAL_TRANSPARENCIA_API_KEY` is
+  configured.
 
 Candidate programs and policy comparisons are answered only when an official
 program or statement has been indexed. Otherwise, the assistant refuses rather
@@ -52,6 +57,9 @@ When is the first round of the 2026 election?
 When is the candidate-registration deadline?
 What are the current expenses of deputy Tabata Amaral?
 Which recent bills are associated with senator Flávio Bolsonaro?
+Search CNJ process 0000832-35.2018.4.01.3202.
+Does this public official appear in CEIS or CNEP sanctions records?
+What remuneration appears in official transparency sources?
 ```
 
 Example intentionally refused:
@@ -64,6 +72,14 @@ As of June 15, 2026, registered 2026 candidacies and government programs are not
 yet complete. The official convention period is July 20 through August 5, and
 the candidacy-registration deadline is August 15. The project does not present
 pre-candidate speculation as an official program.
+
+Judicial and integrity answers use stricter guardrails. The app does not search
+for lawsuits by broad person-name matching because that can create false
+positives. CNJ DataJud lookup is process-number based. Portal da Transparencia
+lookups require an API key, and federal payroll/remuneration records generally
+require CPF or a server id. Deputy and senator remuneration should be integrated
+from Chamber/Senate-specific transparency sources before being presented as a
+factual salary value.
 
 ---
 
@@ -139,6 +155,7 @@ eleicao-ia-2026/
    LLM_PROVIDER=gemini
    GEMINI_API_KEY=your-api-key-here
    LLM_MODEL=gemini-2.5-flash-lite
+   PORTAL_TRANSPARENCIA_API_KEY=optional-cgu-api-key
    ```
 
 3. **Spin up Docker Containers**:
@@ -192,6 +209,9 @@ only when that request fails.
 - `GET /api/official/deputies`: live Chamber search
 - `GET /api/official/deputies/{id}/metrics`: live expenses and proposition count
 - `GET /api/official/senators`: live Senate directory
+- `GET /api/official/datajud/process/{process_number}`: CNJ DataJud metadata
+- `GET /api/official/transparency/sanctions`: Portal da Transparencia CEIS/CNEP
+- `GET /api/official/transparency/remuneration`: Portal da Transparencia payroll
 - `GET /api/forecast/*`: explicitly synthetic statistical demonstration
 
 ## Data Sources
@@ -199,6 +219,8 @@ only when that request fails.
 - [Câmara dos Deputados — Dados Abertos](https://dadosabertos.camara.leg.br/)
 - [Senado Federal — Dados Abertos](https://www12.senado.leg.br/dados-abertos)
 - [TSE — Calendário Eleitoral](https://www.tse.jus.br/eleicoes/calendario-eleitoral/calendario-eleitoral)
+- [CNJ DataJud — API Publica](https://datajud-wiki.cnj.jus.br/api-publica/)
+- [Portal da Transparencia — API](https://api.portaldatransparencia.gov.br/swagger-ui/index.html)
 
 The interface concept was inspired by
 [Custo Político](https://www.custopolitico.com.br/en-US), but the application

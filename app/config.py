@@ -38,8 +38,9 @@ class Settings:
             )
         if self.data_mode == "official_live":
             return (
-                "Official-first assistant using live TSE, Chamber, and Senate "
-                "sources. Polling and simulations remain synthetic demonstrations."
+                "Official-first assistant using live TSE, Chamber, Senate, CNJ "
+                "DataJud, and transparency sources where configured. Polling and "
+                "simulations remain synthetic demonstrations."
             )
         return "Data provenance varies by source. Review citations before relying on results."
 

@@ -11,6 +11,7 @@ def classify_query(query_text: str) -> str:
     Classifies the user query into:
     - 'official_calendar': election dates, registration, conventions, or deadlines.
     - 'official_legislative': current legislators, expenses, or legislative work.
+    - 'official_integrity': judicial, sanctions, transparency, or remuneration data.
     - 'official_policy': candidate programs, policy positions, and comparisons.
     - 'forecast': explicitly requested synthetic polling/simulation demonstration.
     - 'official_evidence': default official-source retrieval route.
@@ -47,6 +48,40 @@ def classify_query(query_text: str) -> str:
     if any(keyword in query_lower for keyword in calendar_keywords):
         return "official_calendar"
 
+    integrity_keywords = [
+        "processo judicial",
+        "processos judiciais",
+        "processos contra",
+        "judicial",
+        "criminal",
+        "certidao criminal",
+        "condenacao",
+        "datajud",
+        "ceis",
+        "cnep",
+        "sancao",
+        "sancoes",
+        "sancionado",
+        "inidoneo",
+        "inidoneidade",
+        "portal da transparencia",
+        "transparencia",
+        "salario",
+        "remuneracao",
+        "contracheque",
+        "subsidio",
+        "subsidios",
+        "quanto ganha",
+    ]
+    process_number_pattern = (
+        r"\b\d{7}[-.]?\d{2}[.]?\d{4}[.]?\d[.]?\d{2}[.]?\d{4}\b"
+    )
+    if (
+        any(keyword in query_lower for keyword in integrity_keywords)
+        or re.search(process_number_pattern, query_lower)
+    ):
+        return "official_integrity"
+
     forecast_keywords = [
         "liderando", "na frente", "intencao de voto", "votos validos", "porcentagem",
         "probabilidade", "segundo turno", "cenario atual", "simulacao", "forecast",
@@ -64,6 +99,7 @@ def classify_query(query_text: str) -> str:
         "gastos parlamentares",
         "despesa parlamentar",
         "despesas parlamentares",
+        "remuneracao parlamentar",
         "projeto de lei",
         "projetos de lei",
         "proposicao legislativa",

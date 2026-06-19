@@ -18,10 +18,13 @@ os.environ["DATA_MODE"] = "official_live"
 from fastapi.testclient import TestClient
 
 from app.api.main import SessionLocal, app
-from app.data_sources.official_answering import build_legislative_chunks
+from app.data_sources.official_answering import (
+    build_integrity_chunks,
+    build_legislative_chunks,
+)
 from app.data_sources.tse_client import parse_calendar_html
 from app.rag.answer_generation import LLMProviderError, generate_grounded_answer
-from app.rag.retrieval import retrieve_hybrid_chunks
+from app.rag.retrieval import classify_query, retrieve_hybrid_chunks
 
 
 class ApplicationTests(unittest.TestCase):
@@ -161,6 +164,91 @@ class ApplicationTests(unittest.TestCase):
         self.assertEqual(len(chunks), 2)
         self.assertEqual(chunks[1]["source_type"], "official_senator_process")
         recent_processes.assert_called_once_with(5894, limit=5)
+
+    def test_integrity_keywords_route_to_official_integrity(self):
+        self.assertEqual(
+            classify_query(
+                "Ha processos judiciais contra a deputada Tabata Amaral?"
+            ),
+            "official_integrity",
+        )
+        self.assertEqual(
+            classify_query(
+                "Qual remuneracao aparece no Portal da Transparencia?"
+            ),
+            "official_integrity",
+        )
+
+    @patch("app.data_sources.official_answering.fetch_process_by_number")
+    def test_process_number_query_builds_datajud_chunks(self, fetch_process):
+        fetch_process.return_value = [
+            {
+                "numeroProcesso": "00008323520184013202",
+                "tribunal": "TRF1",
+                "_datajud_index": "api_publica_trf1",
+                "classe": {"nome": "Procedimento do Juizado Especial Civel"},
+                "dataAjuizamento": "2018-10-29T00:00:00.000Z",
+                "grau": "JE",
+                "nivelSigilo": 0,
+                "orgaoJulgador": {"nome": "JEF Adj - Tefe"},
+                "assuntos": [{"nome": "Concessao"}],
+                "movimentos": [
+                    {
+                        "nome": "Distribuicao",
+                        "dataHora": "2018-10-30T14:06:24.000Z",
+                    }
+                ],
+            }
+        ]
+
+        chunks = build_integrity_chunks(
+            "Consulte o processo 0000832-35.2018.4.01.3202"
+        )
+
+        self.assertEqual(chunks[0]["source_type"], "official_datajud_process")
+        self.assertIn("nao implica culpa", chunks[0]["text"])
+
+    @patch("app.api.routes_chat.build_integrity_chunks", return_value=[])
+    def test_name_only_judicial_query_refuses_broad_search(self, _chunks):
+        response = self.client.post(
+            "/api/chat",
+            json={
+                "query": (
+                    "Quais processos judiciais existem contra a deputada "
+                    "Tabata Amaral?"
+                )
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["route"], "official_integrity")
+        self.assertEqual(payload["provider"], "official-evidence-gate")
+        self.assertIn("nao faz busca ampla por nome", payload["answer"])
+
+    @patch("app.data_sources.official_answering.resolve_current_officeholders")
+    def test_salary_question_returns_transparency_scope_guardrail(
+        self,
+        officeholders,
+    ):
+        officeholders.return_value = [
+            {
+                "id": 204534,
+                "name": "Tabata Amaral",
+                "party": "PSB",
+                "state": "SP",
+                "profile_url": "https://dadosabertos.camara.leg.br/",
+                "source": "Camara dos Deputados - Dados Abertos",
+                "source_url": "https://dadosabertos.camara.leg.br/",
+                "office": "deputy",
+            }
+        ]
+
+        chunks = build_integrity_chunks(
+            "Qual o salario da deputada Tabata Amaral?"
+        )
+
+        self.assertEqual(chunks[0]["source_type"], "official_transparency_scope")
+        self.assertIn("Remuneracao nominal", chunks[0]["text"])
 
     def test_unknown_forecast_scenario_returns_404(self):
         response = self.client.get(
